@@ -1,0 +1,114 @@
+// Pure-JS PNG generation using pngjs — no native modules needed
+import { PNG } from 'pngjs';
+
+const FLAT_COLORS = {
+  blue: [157, 213, 238],
+  yellow: [226, 208, 96],
+  pink: [228, 184, 192],
+};
+
+function getColor(color) {
+  return FLAT_COLORS[color] || FLAT_COLORS.blue;
+}
+
+/**
+ * Generate a solid-color strip image.
+ * Text rendering is skipped — the text appears in secondaryFields on the pass anyway.
+ * Drawing overlay is also skipped (would need canvas/WASM for compositing data URLs).
+ * Strip @3x: 1125 x 432
+ */
+export function generateStripPng(color) {
+  const width = 1125;
+  const height = 432;
+  const [r, g, b] = getColor(color);
+
+  const png = new PNG({ width, height });
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) << 2;
+      png.data[idx] = r;
+      png.data[idx + 1] = g;
+      png.data[idx + 2] = b;
+      png.data[idx + 3] = 255;
+    }
+  }
+
+  return PNG.sync.write(png);
+}
+
+/**
+ * Generate icon image: colored rounded square with memo lines.
+ * Since we can't do anti-aliased round rects with raw pixels easily,
+ * we draw a solid square with simple horizontal lines.
+ * Size: 87x87
+ */
+export function generateIconPng(color) {
+  const size = 87;
+  const [r, g, b] = getColor(color);
+
+  const png = new PNG({ width: size, height: size });
+
+  // Fill with transparent
+  for (let i = 0; i < png.data.length; i += 4) {
+    png.data[i] = 0;
+    png.data[i + 1] = 0;
+    png.data[i + 2] = 0;
+    png.data[i + 3] = 0;
+  }
+
+  // Draw filled square with margin (4px padding, skip rounded corners for simplicity)
+  const pad = 4;
+  const cornerR = 12;
+  for (let y = pad; y < size - pad; y++) {
+    for (let x = pad; x < size - pad; x++) {
+      // Simple rounded corner check
+      const inCorner = (
+        (x < pad + cornerR && y < pad + cornerR && dist(x, y, pad + cornerR, pad + cornerR) > cornerR) ||
+        (x > size - pad - cornerR - 1 && y < pad + cornerR && dist(x, y, size - pad - cornerR - 1, pad + cornerR) > cornerR) ||
+        (x < pad + cornerR && y > size - pad - cornerR - 1 && dist(x, y, pad + cornerR, size - pad - cornerR - 1) > cornerR) ||
+        (x > size - pad - cornerR - 1 && y > size - pad - cornerR - 1 && dist(x, y, size - pad - cornerR - 1, size - pad - cornerR - 1) > cornerR)
+      );
+      if (inCorner) continue;
+
+      const idx = (y * size + x) << 2;
+      png.data[idx] = r;
+      png.data[idx + 1] = g;
+      png.data[idx + 2] = b;
+      png.data[idx + 3] = 255;
+    }
+  }
+
+  // Draw 3 horizontal "memo lines" (dark, semi-transparent)
+  const lineColor = [0, 0, 0, 77]; // rgba(0,0,0,0.3)
+  drawHLine(png, size, 22, 65, 30, lineColor, 3);
+  drawHLine(png, size, 22, 55, 44, lineColor, 3);
+  drawHLine(png, size, 22, 45, 58, lineColor, 3);
+
+  return PNG.sync.write(png);
+}
+
+function dist(x1, y1, x2, y2) {
+  return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
+}
+
+function drawHLine(png, width, x1, x2, y, color, thickness) {
+  const [r, g, b, a] = color;
+  for (let t = 0; t < thickness; t++) {
+    const cy = y + t;
+    if (cy < 0 || cy >= width) continue;
+    for (let x = x1; x <= x2; x++) {
+      if (x < 0 || x >= width) continue;
+      const idx = (cy * width + x) << 2;
+      // Alpha blend
+      const srcA = a / 255;
+      const dstA = png.data[idx + 3] / 255;
+      const outA = srcA + dstA * (1 - srcA);
+      if (outA > 0) {
+        png.data[idx] = Math.round((r * srcA + png.data[idx] * dstA * (1 - srcA)) / outA);
+        png.data[idx + 1] = Math.round((g * srcA + png.data[idx + 1] * dstA * (1 - srcA)) / outA);
+        png.data[idx + 2] = Math.round((b * srcA + png.data[idx + 2] * dstA * (1 - srcA)) / outA);
+        png.data[idx + 3] = Math.round(outA * 255);
+      }
+    }
+  }
+}

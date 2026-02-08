@@ -1,0 +1,17 @@
+name = "wallet-worker"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# KV namespace for pending passes (Safari iOS two-step flow)
+[[kv_namespaces]]
+binding = "PENDING_PASSES"
+id = "9d5bd16e7bff4440a459cf6fc93a86d3"
+
+# Environment variables (set via wrangler secret or dashboard):
+# P12_BASE64 - Base64-encoded .p12 certificate
+# WWDR_PEM - Apple WWDR certificate PEM
+# P12_PASSWORD - Password for the .p12 file
+
+[vars]
+BUILD_NUMBER = "100"

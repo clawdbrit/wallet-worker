@@ -1,0 +1,17 @@
+{
+  "name": "wallet-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "node-forge": "^1.3.1",
+    "jszip": "^3.10.1",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
+  }
+}
