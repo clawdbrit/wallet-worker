@@ -18,9 +18,9 @@ const FLAT_COLORS = {
 };
 
 const LOGO_TEXT_COLORS = {
-  blue: 'rgb(120, 175, 200)',
-  yellow: 'rgb(190, 175, 60)',
-  pink: 'rgb(195, 150, 160)',
+  blue: 'rgb(30, 60, 80)',
+  yellow: 'rgb(60, 50, 10)',
+  pink: 'rgb(80, 30, 50)',
 };
 
 function parseCertificates(env) {
