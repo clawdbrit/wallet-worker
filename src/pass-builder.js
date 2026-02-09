@@ -69,9 +69,15 @@ function buildPassJson({ text, color }) {
   };
 
   if (text && text.trim()) {
+    // Short preview on front of pass (first line, truncated)
+    const firstLine = text.split('\n')[0].substring(0, 50);
     passJson.coupon.secondaryFields = [
-      { key: 'memo', label: 'Note', value: text },
+      { key: 'memo', label: 'Note', value: firstLine + (text.length > firstLine.length ? '…' : '') },
     ];
+    // Full text on back of pass (supports multiline)
+    passJson.coupon.backFields.unshift(
+      { key: 'fullmemo', label: 'Full Note', value: text }
+    );
   }
 
   return passJson;
