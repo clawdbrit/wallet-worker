@@ -70,7 +70,7 @@ export function generateStripPng(color, drawingDataUrl) {
         }
       }
     } catch (e) {
-      console.error('Drawing composite failed:', e);
+      console.error('Drawing composite failed:', e.message, e.stack);
       // Fall through to solid color strip
     }
   }

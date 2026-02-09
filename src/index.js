@@ -111,6 +111,19 @@ export default {
         return pkpassResponse(buffer);
       }
 
+      // Debug: test drawing composite
+      if (path === '/api/debug-drawing' && request.method === 'POST') {
+        const body = await request.json();
+        const { drawingDataUrl } = body;
+        const info = {
+          hasDrawing: !!drawingDataUrl,
+          length: drawingDataUrl ? drawingDataUrl.length : 0,
+          prefix: drawingDataUrl ? drawingDataUrl.substring(0, 50) : null,
+          matchesRegex: drawingDataUrl ? /^data:image\/png;base64,(.+)$/.test(drawingDataUrl) : false,
+        };
+        return jsonResponse(info);
+      }
+
       // Test route
       if (path === '/test-pass') {
         const text = url.searchParams.get('text') || 'Test Memo';
