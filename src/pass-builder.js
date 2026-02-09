@@ -69,15 +69,11 @@ function buildPassJson({ text, color }) {
   };
 
   if (text && text.trim()) {
-    // Short preview on front of pass (first line, truncated)
-    const firstLine = text.split('\n')[0].substring(0, 50);
+    // Join all lines with commas for single-line display
+    const oneLine = text.split('\n').map(l => l.trim()).filter(Boolean).join(', ');
     passJson.coupon.secondaryFields = [
-      { key: 'memo', label: 'Note', value: firstLine + (text.length > firstLine.length ? '…' : '') },
+      { key: 'memo', label: 'Note', value: oneLine },
     ];
-    // Full text on back of pass (supports multiline)
-    passJson.coupon.backFields.unshift(
-      { key: 'fullmemo', label: 'Full Note', value: text }
-    );
   }
 
   return passJson;
