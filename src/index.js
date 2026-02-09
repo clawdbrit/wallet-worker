@@ -111,16 +111,41 @@ export default {
         return pkpassResponse(buffer);
       }
 
-      // Debug: test drawing composite
+      // Debug: test drawing decode
       if (path === '/api/debug-drawing' && request.method === 'POST') {
+        const { PNG: DebugPNG } = await import('pngjs');
         const body = await request.json();
         const { drawingDataUrl } = body;
         const info = {
           hasDrawing: !!drawingDataUrl,
           length: drawingDataUrl ? drawingDataUrl.length : 0,
           prefix: drawingDataUrl ? drawingDataUrl.substring(0, 50) : null,
-          matchesRegex: drawingDataUrl ? /^data:image\/png;base64,(.+)$/.test(drawingDataUrl) : false,
+          matchesRegex: drawingDataUrl ? /^data:image\/[^;]+;base64,(.+)$/.test(drawingDataUrl) : false,
         };
+        if (drawingDataUrl) {
+          try {
+            const base64Match = drawingDataUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
+            if (base64Match) {
+              const binStr = atob(base64Match[1]);
+              info.decodedLength = binStr.length;
+              const bytes = new Uint8Array(binStr.length);
+              for (let i = 0; i < binStr.length; i++) {
+                bytes[i] = binStr.charCodeAt(i);
+              }
+              info.bytesLength = bytes.length;
+              info.firstBytes = Array.from(bytes.slice(0, 8)).map(b => b.toString(16)).join(' ');
+              const drawing = DebugPNG.sync.read(Buffer.from(bytes));
+              info.drawingWidth = drawing.width;
+              info.drawingHeight = drawing.height;
+              info.firstPixel = [drawing.data[0], drawing.data[1], drawing.data[2], drawing.data[3]];
+              info.decodeSuccess = true;
+            }
+          } catch (e) {
+            info.decodeSuccess = false;
+            info.error = e.message;
+            info.stack = e.stack?.split('\n').slice(0, 3);
+          }
+        }
         return jsonResponse(info);
       }
 
