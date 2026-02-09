@@ -24,8 +24,21 @@ function pkpassResponse(buffer, filename = 'walletmemo.pkpass') {
   });
 }
 
-async function buildPass(env, { text, color, drawingDataUrl }) {
-  const stripPng = generateStripPng(color, drawingDataUrl);
+async function buildPass(env, { text, color, drawingDataUrl, stripDataUrl }) {
+  let stripPng;
+  if (stripDataUrl) {
+    // Frontend already rendered the strip — just decode the base64
+    const match = stripDataUrl.match(/^data:image\/png;base64,(.+)$/);
+    if (match) {
+      const binStr = atob(match[1]);
+      stripPng = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) stripPng[i] = binStr.charCodeAt(i);
+    } else {
+      stripPng = generateStripPng(color, null);
+    }
+  } else {
+    stripPng = generateStripPng(color, null);
+  }
   const iconPng = generateIconPng(color);
 
   const passBuffer = await createPass(env, {
@@ -63,18 +76,18 @@ export default {
       // Generate pass (direct download)
       if (path === '/api/generate-pass' && request.method === 'POST') {
         const body = await request.json();
-        const { text, color, drawingDataUrl } = body;
-        const buffer = await buildPass(env, { text, color, drawingDataUrl });
+        const { text, color, drawingDataUrl, stripDataUrl } = body;
+        const buffer = await buildPass(env, { text, color, drawingDataUrl, stripDataUrl });
         return pkpassResponse(buffer);
       }
 
       // Prepare pass (Safari iOS two-step flow) — step 1
       if (path === '/api/prepare-pass' && request.method === 'POST') {
         const body = await request.json();
-        const { text, color, drawingDataUrl } = body;
+        const { text, color, drawingDataUrl, stripDataUrl } = body;
         const token = `${Date.now()}-${Math.random().toString(36).substr(2, 12)}`;
 
-        await env.PENDING_PASSES.put(token, JSON.stringify({ text, color, drawingDataUrl }), {
+        await env.PENDING_PASSES.put(token, JSON.stringify({ text, color, drawingDataUrl, stripDataUrl }), {
           expirationTtl: 300, // 5 minutes
         });
 
