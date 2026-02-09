@@ -32,7 +32,6 @@ async function buildPass(env, { text, color, clientStripPng }) {
   const passBuffer = await createPass(env, {
     text,
     color,
-    drawingDataUrl,
     stripPng,
     iconPng,
   });
@@ -64,8 +63,8 @@ export default {
       // Generate pass (direct download)
       if (path === '/api/generate-pass' && request.method === 'POST') {
         const body = await request.json();
-        const { text, color, drawingDataUrl, stripDataUrl } = body;
-        const buffer = await buildPass(env, { text, color, drawingDataUrl, stripDataUrl });
+        const { text, color } = body;
+        const buffer = await buildPass(env, { text, color });
         return pkpassResponse(buffer);
       }
 
@@ -137,7 +136,7 @@ export default {
             text = atob(t);
           }
         }
-        const buffer = await buildPass(env, { text, color: c, drawingDataUrl: null });
+        const buffer = await buildPass(env, { text, color: c });
         return pkpassResponse(buffer);
       }
 
@@ -183,7 +182,7 @@ export default {
       if (path === '/test-pass') {
         const text = url.searchParams.get('text') || 'Test Memo';
         const color = url.searchParams.get('color') || 'blue';
-        const buffer = await buildPass(env, { text, color, drawingDataUrl: null });
+        const buffer = await buildPass(env, { text, color });
         return pkpassResponse(buffer, 'test-walletmemo.pkpass');
       }
 
