@@ -134,10 +134,11 @@ export default {
               }
               info.bytesLength = bytes.length;
               info.firstBytes = Array.from(bytes.slice(0, 8)).map(b => b.toString(16)).join(' ');
-              const drawing = DebugPNG.sync.read(Buffer.from(bytes));
-              info.drawingWidth = drawing.width;
-              info.drawingHeight = drawing.height;
-              info.firstPixel = [drawing.data[0], drawing.data[1], drawing.data[2], drawing.data[3]];
+              const { decode: decodePng } = await import('fast-png');
+              const decoded = decodePng(bytes);
+              info.drawingWidth = decoded.width;
+              info.drawingHeight = decoded.height;
+              info.firstPixel = [decoded.data[0], decoded.data[1], decoded.data[2], decoded.data[3]];
               info.decodeSuccess = true;
             }
           } catch (e) {

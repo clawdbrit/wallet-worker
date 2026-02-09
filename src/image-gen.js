@@ -1,5 +1,6 @@
-// Pure-JS PNG generation using pngjs — no native modules needed
+// Pure-JS PNG generation using pngjs for writing, fast-png for reading
 import { PNG } from 'pngjs';
+import { decode as decodePng } from 'fast-png';
 
 const FLAT_COLORS = {
   blue: [157, 213, 238],
@@ -45,8 +46,9 @@ export function generateStripPng(color, drawingDataUrl) {
         for (let i = 0; i < binStr.length; i++) {
           bytes[i] = binStr.charCodeAt(i);
         }
-        // Use Buffer.from(Uint8Array) directly — pngjs needs Node Buffer
-        const drawing = PNG.sync.read(Buffer.from(bytes));
+        // Use fast-png for decoding (pngjs inflate fails on CF Workers)
+        const decoded = decodePng(bytes);
+        const drawing = { width: decoded.width, height: decoded.height, data: decoded.data };
 
         // Scale drawing to fit strip width, center vertically
         const scale = Math.min(width / drawing.width, height / drawing.height);
