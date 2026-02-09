@@ -12,28 +12,70 @@ function getColor(color) {
 }
 
 /**
- * Generate a solid-color strip image.
- * Text rendering is skipped — the text appears in secondaryFields on the pass anyway.
- * Drawing overlay is also skipped (would need canvas/WASM for compositing data URLs).
- * Strip @3x: 1125 x 432
+ * Generate strip image.
+ * If a drawing data URL is provided, decode it and composite onto the color background.
+ * Otherwise, generate a solid-color strip.
+ * Strip @3x: 1125 x 1032 (tall strip for more visual space)
  */
-export function generateStripPng(color) {
+export function generateStripPng(color, drawingDataUrl) {
   const width = 1125;
-  const height = 432;
+  const height = 1032;
   const [r, g, b] = getColor(color);
 
-  const png = new PNG({ width, height });
+  // Create background
+  const bg = new PNG({ width, height });
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) << 2;
-      png.data[idx] = r;
-      png.data[idx + 1] = g;
-      png.data[idx + 2] = b;
-      png.data[idx + 3] = 255;
+      bg.data[idx] = r;
+      bg.data[idx + 1] = g;
+      bg.data[idx + 2] = b;
+      bg.data[idx + 3] = 255;
     }
   }
 
-  return PNG.sync.write(png);
+  // If drawing provided, composite it on top
+  if (drawingDataUrl) {
+    try {
+      // Extract base64 from data URL
+      const base64Match = drawingDataUrl.match(/^data:image\/png;base64,(.+)$/);
+      if (base64Match) {
+        const drawingBytes = Uint8Array.from(atob(base64Match[1]), c => c.charCodeAt(0));
+        const drawing = PNG.sync.read(Buffer.from(drawingBytes));
+
+        // Center the drawing on the strip
+        const offsetX = Math.floor((width - drawing.width) / 2);
+        const offsetY = Math.floor((height - drawing.height) / 2);
+
+        for (let y = 0; y < drawing.height; y++) {
+          for (let x = 0; x < drawing.width; x++) {
+            const destX = x + offsetX;
+            const destY = y + offsetY;
+            if (destX < 0 || destX >= width || destY < 0 || destY >= height) continue;
+
+            const srcIdx = (y * drawing.width + x) << 2;
+            const dstIdx = (destY * width + destX) << 2;
+            const srcA = drawing.data[srcIdx + 3] / 255;
+            if (srcA === 0) continue;
+
+            const dstA = bg.data[dstIdx + 3] / 255;
+            const outA = srcA + dstA * (1 - srcA);
+            if (outA > 0) {
+              bg.data[dstIdx] = Math.round((drawing.data[srcIdx] * srcA + bg.data[dstIdx] * dstA * (1 - srcA)) / outA);
+              bg.data[dstIdx + 1] = Math.round((drawing.data[srcIdx + 1] * srcA + bg.data[dstIdx + 1] * dstA * (1 - srcA)) / outA);
+              bg.data[dstIdx + 2] = Math.round((drawing.data[srcIdx + 2] * srcA + bg.data[dstIdx + 2] * dstA * (1 - srcA)) / outA);
+              bg.data[dstIdx + 3] = Math.round(outA * 255);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Drawing composite failed:', e);
+      // Fall through to solid color strip
+    }
+  }
+
+  return PNG.sync.write(bg);
 }
 
 /**

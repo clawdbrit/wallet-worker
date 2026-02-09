@@ -25,7 +25,7 @@ function pkpassResponse(buffer, filename = 'walletmemo.pkpass') {
 }
 
 async function buildPass(env, { text, color, drawingDataUrl }) {
-  const stripPng = generateStripPng(color, text);
+  const stripPng = generateStripPng(color, drawingDataUrl);
   const iconPng = generateIconPng(color);
 
   const passBuffer = await createPass(env, {
