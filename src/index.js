@@ -24,21 +24,9 @@ function pkpassResponse(buffer, filename = 'walletmemo.pkpass') {
   });
 }
 
-async function buildPass(env, { text, color, drawingDataUrl, stripDataUrl }) {
-  let stripPng;
-  if (stripDataUrl) {
-    // Frontend already rendered the strip — just decode the base64
-    const match = stripDataUrl.match(/^data:image\/png;base64,(.+)$/);
-    if (match) {
-      const binStr = atob(match[1]);
-      stripPng = new Uint8Array(binStr.length);
-      for (let i = 0; i < binStr.length; i++) stripPng[i] = binStr.charCodeAt(i);
-    } else {
-      stripPng = generateStripPng(color, null);
-    }
-  } else {
-    stripPng = generateStripPng(color, null);
-  }
+async function buildPass(env, { text, color, clientStripPng }) {
+  // Use client-rendered strip if provided, otherwise generate solid color
+  const stripPng = clientStripPng || generateStripPng(color, null);
   const iconPng = generateIconPng(color);
 
   const passBuffer = await createPass(env, {
@@ -83,13 +71,36 @@ export default {
 
       // Prepare pass (Safari iOS two-step flow) — step 1
       if (path === '/api/prepare-pass' && request.method === 'POST') {
-        const body = await request.json();
-        const { text, color, drawingDataUrl, stripDataUrl } = body;
+        let text, color, stripPngBytes;
+        const contentType = request.headers.get('content-type') || '';
+        
+        if (contentType.includes('multipart/form-data')) {
+          const formData = await request.formData();
+          text = formData.get('text') || '';
+          color = formData.get('color') || 'blue';
+          const stripFile = formData.get('strip');
+          if (stripFile && stripFile.size > 0) {
+            stripPngBytes = new Uint8Array(await stripFile.arrayBuffer());
+          }
+        } else {
+          const body = await request.json();
+          text = body.text || '';
+          color = body.color || 'blue';
+        }
+
         const token = `${Date.now()}-${Math.random().toString(36).substr(2, 12)}`;
 
-        await env.PENDING_PASSES.put(token, JSON.stringify({ text, color, drawingDataUrl, stripDataUrl }), {
-          expirationTtl: 300, // 5 minutes
+        // Store metadata in KV
+        await env.PENDING_PASSES.put(token, JSON.stringify({ text, color }), {
+          expirationTtl: 300,
         });
+
+        // Store strip PNG separately if provided (binary, avoids base64 bloat)
+        if (stripPngBytes) {
+          await env.PENDING_PASSES.put(`${token}:strip`, stripPngBytes, {
+            expirationTtl: 300,
+          });
+        }
 
         return jsonResponse({ token });
       }
@@ -102,8 +113,14 @@ export default {
         if (!stored) {
           return jsonResponse({ error: 'Pass token expired or invalid. Please try again.' }, 404);
         }
+        // Fetch strip PNG if it was stored
+        const stripPngBytes = await env.PENDING_PASSES.get(`${token}:strip`, { type: 'arrayBuffer' });
         await env.PENDING_PASSES.delete(token);
+        await env.PENDING_PASSES.delete(`${token}:strip`);
         const passData = JSON.parse(stored);
+        if (stripPngBytes) {
+          passData.clientStripPng = new Uint8Array(stripPngBytes);
+        }
         const buffer = await buildPass(env, passData);
         return pkpassResponse(buffer);
       }
