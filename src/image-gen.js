@@ -37,11 +37,19 @@ export function generateStripPng(color, drawingDataUrl) {
   // If drawing provided, composite it on top
   if (drawingDataUrl) {
     try {
-      // Extract base64 from data URL
-      const base64Match = drawingDataUrl.match(/^data:image\/png;base64,(.+)$/);
+      // Extract base64 from data URL (handle both png and other formats)
+      const base64Match = drawingDataUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
       if (base64Match) {
-        const drawingBytes = Uint8Array.from(atob(base64Match[1]), c => c.charCodeAt(0));
-        const drawing = PNG.sync.read(Buffer.from(drawingBytes));
+        // Decode base64 to binary string, then to Buffer for pngjs
+        const b64 = base64Match[1];
+        const binStr = atob(b64);
+        const bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) {
+          bytes[i] = binStr.charCodeAt(i);
+        }
+        // pngjs needs Buffer-like input
+        const buf = Buffer.from(bytes.buffer);
+        const drawing = PNG.sync.read(buf);
 
         // Center the drawing on the strip
         const offsetX = Math.floor((width - drawing.width) / 2);
@@ -70,8 +78,18 @@ export function generateStripPng(color, drawingDataUrl) {
         }
       }
     } catch (e) {
+      // Embed error in a 1x1 red pixel so we know it failed
       console.error('Drawing composite failed:', e.message, e.stack);
-      // Fall through to solid color strip
+      // Stamp error marker: make top-left 10x10 red
+      for (let y = 0; y < 10; y++) {
+        for (let x = 0; x < 10; x++) {
+          const idx = (y * width + x) << 2;
+          bg.data[idx] = 255;
+          bg.data[idx + 1] = 0;
+          bg.data[idx + 2] = 0;
+          bg.data[idx + 3] = 255;
+        }
+      }
     }
   }
 
