@@ -124,29 +124,28 @@ export async function createPass(env, { text, color, stripPng, iconPng }) {
   const passJson = buildPassJson({ text, color });
   const passJsonStr = JSON.stringify(passJson);
 
-  // Collect all files as binary strings for hashing
-  const files = {
-    'pass.json': passJsonStr,
-    'strip.png': bufferToBinaryString(stripPng),
-    'strip@2x.png': bufferToBinaryString(stripPng),
-    'strip@3x.png': bufferToBinaryString(stripPng),
-    'icon.png': bufferToBinaryString(iconPng),
-    'icon@2x.png': bufferToBinaryString(iconPng),
-  };
-
-  // Build manifest
-  const manifest = {};
-  for (const [name, data] of Object.entries(files)) {
-    if (name === 'pass.json') {
-      // pass.json is UTF-8 text
-      const md = forge.md.sha1.create();
-      md.update(data, 'utf8');
-      manifest[name] = md.digest().toHex();
-    } else {
-      // Binary files
-      manifest[name] = sha1Hex(data);
+  // Hash helper: SHA-1 hex from Uint8Array or string
+  function sha1HexFromBytes(buf) {
+    const md = forge.md.sha1.create();
+    // Convert Uint8Array to forge binary string
+    let binary = '';
+    for (let i = 0; i < buf.length; i++) {
+      binary += String.fromCharCode(buf[i]);
     }
+    md.update(binary, 'raw');
+    return md.digest().toHex();
   }
+
+  // Build manifest — hash the exact bytes that go into the ZIP
+  const manifest = {};
+  // pass.json as UTF-8 bytes
+  const passJsonBytes = new TextEncoder().encode(passJsonStr);
+  manifest['pass.json'] = sha1HexFromBytes(passJsonBytes);
+  manifest['strip.png'] = sha1HexFromBytes(stripPng);
+  manifest['strip@2x.png'] = sha1HexFromBytes(stripPng);
+  manifest['strip@3x.png'] = sha1HexFromBytes(stripPng);
+  manifest['icon.png'] = sha1HexFromBytes(iconPng);
+  manifest['icon@2x.png'] = sha1HexFromBytes(iconPng);
 
   const manifestJson = JSON.stringify(manifest);
 
