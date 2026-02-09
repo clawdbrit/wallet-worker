@@ -34,34 +34,37 @@ export function generateStripPng(color, drawingDataUrl) {
     }
   }
 
-  // If drawing provided, composite it on top
+  // If drawing provided, try to composite it on top
   if (drawingDataUrl) {
     try {
-      // Extract base64 from data URL (handle both png and other formats)
       const base64Match = drawingDataUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
       if (base64Match) {
-        // Decode base64 to binary string, then to Buffer for pngjs
         const b64 = base64Match[1];
         const binStr = atob(b64);
         const bytes = new Uint8Array(binStr.length);
         for (let i = 0; i < binStr.length; i++) {
           bytes[i] = binStr.charCodeAt(i);
         }
-        // pngjs needs Buffer-like input
-        const buf = Buffer.from(bytes.buffer);
-        const drawing = PNG.sync.read(buf);
+        // Use Buffer.from(Uint8Array) directly — pngjs needs Node Buffer
+        const drawing = PNG.sync.read(Buffer.from(bytes));
 
-        // Center the drawing on the strip
-        const offsetX = Math.floor((width - drawing.width) / 2);
-        const offsetY = Math.floor((height - drawing.height) / 2);
+        // Scale drawing to fit strip width, center vertically
+        const scale = Math.min(width / drawing.width, height / drawing.height);
+        const scaledW = Math.floor(drawing.width * scale);
+        const scaledH = Math.floor(drawing.height * scale);
+        const offsetX = Math.floor((width - scaledW) / 2);
+        const offsetY = Math.floor((height - scaledH) / 2);
 
-        for (let y = 0; y < drawing.height; y++) {
-          for (let x = 0; x < drawing.width; x++) {
-            const destX = x + offsetX;
-            const destY = y + offsetY;
+        for (let dy = 0; dy < scaledH; dy++) {
+          for (let dx = 0; dx < scaledW; dx++) {
+            const sx = Math.floor(dx / scale);
+            const sy = Math.floor(dy / scale);
+            const destX = dx + offsetX;
+            const destY = dy + offsetY;
             if (destX < 0 || destX >= width || destY < 0 || destY >= height) continue;
+            if (sx >= drawing.width || sy >= drawing.height) continue;
 
-            const srcIdx = (y * drawing.width + x) << 2;
+            const srcIdx = (sy * drawing.width + sx) << 2;
             const dstIdx = (destY * width + destX) << 2;
             const srcA = drawing.data[srcIdx + 3] / 255;
             if (srcA === 0) continue;
@@ -78,18 +81,8 @@ export function generateStripPng(color, drawingDataUrl) {
         }
       }
     } catch (e) {
-      // Embed error in a 1x1 red pixel so we know it failed
       console.error('Drawing composite failed:', e.message, e.stack);
-      // Stamp error marker: make top-left 10x10 red
-      for (let y = 0; y < 10; y++) {
-        for (let x = 0; x < 10; x++) {
-          const idx = (y * width + x) << 2;
-          bg.data[idx] = 255;
-          bg.data[idx + 1] = 0;
-          bg.data[idx + 2] = 0;
-          bg.data[idx + 3] = 255;
-        }
-      }
+      // Fall through to solid color strip
     }
   }
 
