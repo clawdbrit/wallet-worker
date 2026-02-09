@@ -113,7 +113,6 @@ export default {
 
       // Debug: test drawing decode
       if (path === '/api/debug-drawing' && request.method === 'POST') {
-        const { PNG: DebugPNG } = await import('pngjs');
         const body = await request.json();
         const { drawingDataUrl } = body;
         const info = {
