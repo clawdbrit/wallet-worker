@@ -79,17 +79,6 @@ function buildPassJson({ text, color }) {
   return passJson;
 }
 
-function sha1Hex(data) {
-  const md = forge.md.sha1.create();
-  if (typeof data === 'string') {
-    md.update(data, 'utf8');
-  } else {
-    // Binary string
-    md.update(data, 'raw');
-  }
-  return md.digest().toHex();
-}
-
 function signManifest(manifestJson, signerCert, signerKey, wwdrCert) {
   const p7 = forge.pkcs7.createSignedData();
   p7.content = forge.util.createBuffer(manifestJson, 'utf8');
@@ -168,12 +157,5 @@ export async function createPass(env, { text, color, stripPng, iconPng }) {
   const zipBuffer = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
   return zipBuffer;
 }
-
-function bufferToBinaryString(buf) {
-  // buf is a Buffer or Uint8Array
-  let str = '';
-  for (let i = 0; i < buf.length; i++) {
-    str += String.fromCharCode(buf[i]);
-  }
   return str;
 }

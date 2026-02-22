@@ -26,7 +26,7 @@ function pkpassResponse(buffer, filename = 'walletmemo.pkpass') {
 
 async function buildPass(env, { text, color, clientStripPng }) {
   // Use client-rendered strip if provided, otherwise generate solid color
-  const stripPng = clientStripPng || generateStripPng(color, null);
+  const stripPng = clientStripPng || generateStripPng(color);
   const iconPng = generateIconPng(color);
 
   const passBuffer = await createPass(env, {
@@ -138,44 +138,6 @@ export default {
         }
         const buffer = await buildPass(env, { text, color: c });
         return pkpassResponse(buffer);
-      }
-
-      // Debug: test drawing decode
-      if (path === '/api/debug-drawing' && request.method === 'POST') {
-        const body = await request.json();
-        const { drawingDataUrl } = body;
-        const info = {
-          hasDrawing: !!drawingDataUrl,
-          length: drawingDataUrl ? drawingDataUrl.length : 0,
-          prefix: drawingDataUrl ? drawingDataUrl.substring(0, 50) : null,
-          matchesRegex: drawingDataUrl ? /^data:image\/[^;]+;base64,(.+)$/.test(drawingDataUrl) : false,
-        };
-        if (drawingDataUrl) {
-          try {
-            const base64Match = drawingDataUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
-            if (base64Match) {
-              const binStr = atob(base64Match[1]);
-              info.decodedLength = binStr.length;
-              const bytes = new Uint8Array(binStr.length);
-              for (let i = 0; i < binStr.length; i++) {
-                bytes[i] = binStr.charCodeAt(i);
-              }
-              info.bytesLength = bytes.length;
-              info.firstBytes = Array.from(bytes.slice(0, 8)).map(b => b.toString(16)).join(' ');
-              const { decode: decodePng } = await import('fast-png');
-              const decoded = decodePng(bytes);
-              info.drawingWidth = decoded.width;
-              info.drawingHeight = decoded.height;
-              info.firstPixel = [decoded.data[0], decoded.data[1], decoded.data[2], decoded.data[3]];
-              info.decodeSuccess = true;
-            }
-          } catch (e) {
-            info.decodeSuccess = false;
-            info.error = e.message;
-            info.stack = e.stack?.split('\n').slice(0, 3);
-          }
-        }
-        return jsonResponse(info);
       }
 
       // Test route
