@@ -1,6 +1,5 @@
-// Pure-JS PNG generation using pngjs for writing, fast-png for reading
+// Pure-JS PNG generation using pngjs
 import { PNG } from 'pngjs';
-import { decode as decodePng } from 'fast-png';
 
 const FLAT_COLORS = {
   blue: [157, 213, 238],
@@ -13,17 +12,14 @@ function getColor(color) {
 }
 
 /**
- * Generate strip image.
- * If a drawing data URL is provided, decode it and composite onto the color background.
- * Otherwise, generate a solid-color strip.
+ * Generate a solid-color strip image.
  * Strip @3x: 1125 x 1032 (tall strip for more visual space)
  */
-export function generateStripPng(color, drawingDataUrl) {
+export function generateStripPng(color) {
   const width = 1125;
   const height = 1032;
   const [r, g, b] = getColor(color);
 
-  // Create background
   const bg = new PNG({ width, height });
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -32,59 +28,6 @@ export function generateStripPng(color, drawingDataUrl) {
       bg.data[idx + 1] = g;
       bg.data[idx + 2] = b;
       bg.data[idx + 3] = 255;
-    }
-  }
-
-  // If drawing provided, try to composite it on top
-  if (drawingDataUrl) {
-    try {
-      const base64Match = drawingDataUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
-      if (base64Match) {
-        const b64 = base64Match[1];
-        const binStr = atob(b64);
-        const bytes = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) {
-          bytes[i] = binStr.charCodeAt(i);
-        }
-        // Use fast-png for decoding (pngjs inflate fails on CF Workers)
-        const decoded = decodePng(bytes);
-        const drawing = { width: decoded.width, height: decoded.height, data: decoded.data };
-
-        // Scale drawing to fit strip width, center vertically
-        const scale = Math.min(width / drawing.width, height / drawing.height);
-        const scaledW = Math.floor(drawing.width * scale);
-        const scaledH = Math.floor(drawing.height * scale);
-        const offsetX = Math.floor((width - scaledW) / 2);
-        const offsetY = Math.floor((height - scaledH) / 2);
-
-        for (let dy = 0; dy < scaledH; dy++) {
-          for (let dx = 0; dx < scaledW; dx++) {
-            const sx = Math.floor(dx / scale);
-            const sy = Math.floor(dy / scale);
-            const destX = dx + offsetX;
-            const destY = dy + offsetY;
-            if (destX < 0 || destX >= width || destY < 0 || destY >= height) continue;
-            if (sx >= drawing.width || sy >= drawing.height) continue;
-
-            const srcIdx = (sy * drawing.width + sx) << 2;
-            const dstIdx = (destY * width + destX) << 2;
-            const srcA = drawing.data[srcIdx + 3] / 255;
-            if (srcA === 0) continue;
-
-            const dstA = bg.data[dstIdx + 3] / 255;
-            const outA = srcA + dstA * (1 - srcA);
-            if (outA > 0) {
-              bg.data[dstIdx] = Math.round((drawing.data[srcIdx] * srcA + bg.data[dstIdx] * dstA * (1 - srcA)) / outA);
-              bg.data[dstIdx + 1] = Math.round((drawing.data[srcIdx + 1] * srcA + bg.data[dstIdx + 1] * dstA * (1 - srcA)) / outA);
-              bg.data[dstIdx + 2] = Math.round((drawing.data[srcIdx + 2] * srcA + bg.data[dstIdx + 2] * dstA * (1 - srcA)) / outA);
-              bg.data[dstIdx + 3] = Math.round(outA * 255);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Drawing composite failed:', e.message, e.stack);
-      // Fall through to solid color strip
     }
   }
 
